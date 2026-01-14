@@ -5,20 +5,15 @@ from dotenv import load_dotenv
 # Загружаем переменные из .env файла
 load_dotenv()
 
-# Учетные данные
+ # Глобальные переменные окружения
 LOGIN = os.getenv("LOGIN")
 PASSWORD = os.getenv("PASSWORD")
-
-# Фильтрация
 FILTER_LIST_STR = os.getenv("FILTER_LIST", "")
 FILTER_LIST = [email.strip().lower() for email in FILTER_LIST_STR.split(',') if email.strip()]
 
-# Настройки путей
+ # Настройки путей (остаются здесь, т.к. они не зависят от типа отчета)
 OUTPUT_DIR = "."
 REPORT_DIR = "Отчет"
-
-# Настройки отчета
-REPORT_SHEET_NAME = "Сеансы входов" # Имя листа в файле statistic.xls для обработки
 
 def setup_logging():
     """Настраивает конфигурацию логирования."""
@@ -29,12 +24,12 @@ def setup_logging():
     logging.info("Логирование настроено.")
 
 def validate_credentials():
-    """Проверяет наличие учетных данных."""
+    """Проверяет наличие учетных данных в .env."""
     if not all([LOGIN, PASSWORD]):
         logging.error("Переменные LOGIN и PASSWORD должны быть заданы в .env файле.")
         return False
+    logging.info("Учетные данные успешно загружены.")
     return True
 
 if FILTER_LIST:
-    logging.info(f"Загружен FILTER_LIST из .env, содержит {len(FILTER_LIST)} адресов для фильтрации.")
-
+    logging.info(f"Загружен глобальный FILTER_LIST из .env, содержит {len(FILTER_LIST)} адресов для фильтрации.")
