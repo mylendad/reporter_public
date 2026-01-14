@@ -1,0 +1,97 @@
+# Описание отчета для вебинаров МТС Линк
+report_name: "MTS Link Webinar Report"
+
+# Настройки для Selenium и скрапинга
+source_settings:
+  login_url: "https://my.mts-link.ru/"
+  selectors:
+    login:
+      email_input: 'input[type="email"], input[name="email"]'
+      submit_button: 'button[type="submit"]'
+      password_input: 'input[type="password"], input[name="password"]'
+      login_button: 'button[type="submit"]'
+      success_indicator: "//*[contains(text(), 'Мой тариф')]"
+    download:
+      stats_button: |
+        //div[contains(., 'Скачать статистику')]/a[contains(@data-bind, "'xls', 'stats'")]
+      chat_button: |
+        //div[contains(., 'Скачать чат')]/a[contains(@data-bind, "'xls', 'chat'")]
+      snackbar_notification: "//div[contains(@class, 'MuiSnackbarContent-root') and contains(., 'Файл подготовлен')]"
+      snackbar_link: ".//a"
+      snackbar_close_button: ".//button[contains(@class, 'MuiIconButton-root')]"
+    scraper:
+      presenter: "Ведущий вебинара:"
+      new_emails: "td[data-testid='PlotPie.LabelNumber.visitorsChart.0']"
+
+
+# Настройки для обработки данных
+processing_settings:
+  sheet_name: "Сеансы входов"
+  
+  # Опционально: задает строгий порядок столбцов в листе "география"
+  geography_column_order:
+    - "Имя"
+    - "Фамилия"
+    - "Почта"
+    - "Регион"
+    - "Город"
+    - "Присутствие на вебинаре"
+    - "Откуда узнали"
+
+  # Карта для финального переименования столбцов (после основной обработки)
+  rename_map:
+    "Откуда вы о нас узнали?": "Откуда узнали"
+
+  # Карта столбцов: как столбец называется в файле -> наше внутреннее имя
+  column_map:
+    "Имя": "first_name"
+    "Фамилия": "last_name"
+    "Email": "email"
+    "Регион": "region"
+    "Город": "city"
+    "Время старта мероприятия": "start_time"
+    "Время завершения мероприятия": "end_time"
+    "Вебинар": "webinar_topic"
+    "Время входа": "entry_time"
+    "Откуда вы о нас узнали?": "origin_question"
+    "Роль": "role"
+    "Дата проведения": "event_date"
+  
+  # Значения для определения присутствия
+  not_attended_values:
+    - ""
+    - "Не посетил"
+
+  # Настройки фильтрации
+  filter:
+    roles_to_exclude:
+      - "Администратор"
+      - "Ведущий"
+
+# Описание файлов, которые нужно сгенерировать
+output_files:
+  main_report:
+    enabled: true
+    filename_template: "Отчет по вебинару {date}.xlsx"
+    sheets:
+      - type: "geography"
+        name: "география участников"
+      - type: "summary"
+        name: "вебинар"
+      - type: "chat"
+        name: "чат"
+  mailing_list:
+    enabled: true
+    filename_template: "Рассылка {date}.xlsx"
+    sheets:
+      - type: "geography"
+        name: "география участников"
+        drop_columns: ["origin_question"] # внутреннее имя столбца для удаления
+      - type: "summary"
+        name: "вебинар"
+      - type: "chat"
+        name: "чат"
+  attended_emails:
+    enabled: true
+    filename_template: "data1.xlsx"
+    type: "attended_emails_only"
