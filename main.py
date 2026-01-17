@@ -1,14 +1,12 @@
 import argparse
-import logging
-
 from reporter import (
-    OUTPUT_DIR,
     BrowserManager,
     cleanup_files,
     load_config,
     process_and_generate_reports,
     setup_logging,
     validate_credentials,
+    OUTPUT_DIR,
 )
 
 
@@ -50,9 +48,7 @@ def main():
         logging.info("--> main: Received URL.")
 
         # 3. Инициализация и запуск
-        browser_manager = BrowserManager(
-            output_dir=OUTPUT_DIR, report_config=report_config
-        )
+        browser_manager = BrowserManager(output_dir=OUTPUT_DIR, report_config=report_config)
         logging.info("--> main: BrowserManager initialized.")
 
         try:
