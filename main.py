@@ -1,9 +1,15 @@
 import logging
 import argparse
-from reporter import config, config_loader
-from reporter.browser import BrowserManager
-from reporter.data_processor import process_and_generate_reports
-from reporter.file_handler import cleanup_files
+from reporter import (
+    BrowserManager,
+    cleanup_files,
+    load_config,
+    process_and_generate_reports,
+    setup_logging,
+    validate_credentials,
+    OUTPUT_DIR,
+)
+
 
 def main():
     """
@@ -12,7 +18,7 @@ def main():
     print("Main function started execution.")
     try:
         # 1. Настройка и парсинг аргументов
-        config.setup_logging()
+        setup_logging()
         logging.info("--> main: Script started.")
         
         parser = argparse.ArgumentParser(description="Генератор отчетов по вебинарам.")
@@ -26,12 +32,12 @@ def main():
         logging.info("--> main: Parsed arguments.")
 
         # 2. Загрузка конфигурации
-        report_config = config_loader.load_config(args.config)
+        report_config = load_config(args.config)
         if not report_config:
             return
         logging.info("--> main: Loaded report config.")
 
-        if not config.validate_credentials():
+        if not validate_credentials():
             return
         logging.info("--> main: Validated credentials.")
 
@@ -42,7 +48,7 @@ def main():
         logging.info("--> main: Received URL.")
 
         # 3. Инициализация и запуск
-        browser_manager = BrowserManager(output_dir=config.OUTPUT_DIR, report_config=report_config)
+        browser_manager = BrowserManager(output_dir=OUTPUT_DIR, report_config=report_config)
         logging.info("--> main: BrowserManager initialized.")
         
         try:
