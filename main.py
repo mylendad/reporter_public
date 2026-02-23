@@ -2,7 +2,7 @@ import argparse
 import logging
 from typing import Any, Dict, Optional
 
-from reporter import (
+from app import (
     OUTPUT_DIR,
     BrowserManager,
     cleanup_files,
