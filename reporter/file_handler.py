@@ -1,7 +1,8 @@
 import os
 import logging
+from typing import List, Optional
 
-def cleanup_files(files):
+def cleanup_files(files: List[Optional[str]]) -> None:
     """
     Удаляет список временных файлов.
     :param files: Список путей к файлам для удаления.

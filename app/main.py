@@ -1,6 +1,6 @@
 import argparse
 import logging
-from typing import Any, Dict, Optional
+from typing import Any, Dict, List, Optional, Tuple
 
 from reporter import (
     OUTPUT_DIR,
@@ -10,6 +10,7 @@ from reporter import (
     process_and_generate_reports,
     validate_credentials,
 )
+from bs4 import BeautifulSoup
 
 
 def main() -> None:
@@ -33,7 +34,7 @@ def main() -> None:
         logging.info("--> main: Parsed arguments.")
 
         # 2. Загрузка конфигурации
-        report_config: Optional[Dict[str, Any]] = load_config(args.config)
+        report_config = load_config(args.config)
         if not report_config:
             return
         logging.info("--> main: Loaded report config.")

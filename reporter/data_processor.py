@@ -1,14 +1,16 @@
 import os
 import pandas as pd
 import logging
+from typing import Any, Dict, List, Optional, Tuple
+from bs4 import BeautifulSoup
 
 from . import config, scraper, config_loader
 
-def process_and_generate_reports(statistic_file_path, chat_file_path, soup, report_config):
+def process_and_generate_reports(statistic_file_path: str, chat_file_path: Optional[str], soup: BeautifulSoup, report_config: Dict[str, Any]) -> None:
     """
     Главная функция обработки данных, управляемая конфигурационным файлом.
     """
-    proc_settings = report_config['processing_settings']
+    proc_settings: Dict[str, Any] = report_config['processing_settings']
     
     if not statistic_file_path or not os.path.exists(statistic_file_path):
         logging.error("Файл статистики не найден. Обработка невозможна.")
@@ -17,14 +19,14 @@ def process_and_generate_reports(statistic_file_path, chat_file_path, soup, repo
     logging.info(f"Начинаю обработку файла статистики: {statistic_file_path}")
     
     try:
-        source_df = pd.read_excel(statistic_file_path, sheet_name=proc_settings['sheet_name'])
+        source_df: pd.DataFrame = pd.read_excel(statistic_file_path, sheet_name=proc_settings['sheet_name'])
     except Exception as e:
         logging.error(f"Не удалось прочитать лист '{proc_settings['sheet_name']}' из '{statistic_file_path}'. Ошибка: {e}")
         return
 
     # Переименовываем столбцы в соответствии с картой для внутреннего использования
-    inverted_map = {v: k for k, v in proc_settings['column_map'].items()}
-    df = source_df.rename(columns=proc_settings['column_map'])
+    inverted_map: Dict[str, str] = {v: k for k, v in proc_settings['column_map'].items()}
+    df: pd.DataFrame = source_df.rename(columns=proc_settings['column_map'])
 
     # Базовая обработка
     df.drop_duplicates(subset=['first_name', 'last_name'], inplace=True, keep='first')
@@ -33,21 +35,21 @@ def process_and_generate_reports(statistic_file_path, chat_file_path, soup, repo
     # Фильтрация
     df = _filter_data(df, report_config)
 
-    webinar_date_str = _get_webinar_date_str(df)
+    webinar_date_str: str = _get_webinar_date_str(df)
     os.makedirs(config.REPORT_DIR, exist_ok=True)
     
     # Создание основных DF для отчетов
-    geography_df = _create_geography_df(df, report_config)
-    webinar_df = _create_webinar_df(df, geography_df, soup, report_config)
-    chat_df = _create_chat_df(chat_file_path) if chat_file_path and os.path.exists(chat_file_path) else None
+    geography_df: pd.DataFrame = _create_geography_df(df, report_config)
+    webinar_df: pd.DataFrame = _create_webinar_df(df, geography_df, soup, report_config)
+    chat_df: Optional[pd.DataFrame] = _create_chat_df(chat_file_path) if chat_file_path and os.path.exists(chat_file_path) else None
 
     # Генерация выходных файлов на основе конфига
     for report_key, report_details in report_config.get('output_files', {}).items():
         if report_details.get('enabled'):
             logging.info(f"Генерирую отчет '{report_key}'...")
             
-            filename = report_details['filename_template'].format(date=webinar_date_str)
-            filepath = os.path.join(config.REPORT_DIR, filename)
+            filename: str = report_details['filename_template'].format(date=webinar_date_str)
+            filepath: str = os.path.join(config.REPORT_DIR, filename)
 
             if report_details.get('type') == 'attended_emails_only':
                 _create_attended_emails_file(geography_df, filepath, report_config)
@@ -57,18 +59,18 @@ def process_and_generate_reports(statistic_file_path, chat_file_path, soup, repo
     logging.info("Генерация всех отчетов завершена.")
 
 
-def _save_standard_report(filepath, report_details, base_geography_df, webinar_df, chat_df):
+def _save_standard_report(filepath: str, report_details: Dict[str, Any], base_geography_df: pd.DataFrame, webinar_df: pd.DataFrame, chat_df: Optional[pd.DataFrame]) -> None:
     """Сохраняет стандартный отчет с несколькими листами, как описано в конфиге."""
     with pd.ExcelWriter(filepath, engine='openpyxl') as writer:
         for sheet_info in report_details.get('sheets', []):
-            sheet_type = sheet_info['type']
-            sheet_name = sheet_info['name']
+            sheet_type: str = sheet_info['type']
+            sheet_name: str = sheet_info['name']
 
             if sheet_type == 'geography':
-                geo_df = base_geography_df.copy()
+                geo_df: pd.DataFrame = base_geography_df.copy()
                 if 'drop_columns' in sheet_info:
                     # Напрямую используем имена из конфига, т.к. в geo_df они уже финальные
-                    cols_to_drop = sheet_info['drop_columns']
+                    cols_to_drop: List[str] = sheet_info['drop_columns']
                     geo_df.drop(columns=cols_to_drop, inplace=True, errors='ignore')
                     logging.info(f"Столбцы {cols_to_drop} удалены для отчета {os.path.basename(filepath)}.")
                 
@@ -83,55 +85,54 @@ def _save_standard_report(filepath, report_details, base_geography_df, webinar_d
     logging.info(f"Лист '{sheet_info['name']}' добавлен в отчет {os.path.basename(filepath)}.")
 
 
-def _create_attended_emails_file(geography_df, filepath, report_config):
+def _create_attended_emails_file(geography_df: pd.DataFrame, filepath: str, report_config: Dict[str, Any]) -> None:
     """Создает и сохраняет файл только с email-адресами присутствовавших."""
-    attended_df = geography_df[geography_df['Присутствие на вебинаре'] == 'да'].copy()
+    attended_df: pd.DataFrame = geography_df[geography_df['Присутствие на вебинаре'] == 'да'].copy()
 
     # Динамически находим финальные имена нужных столбцов
-    proc_settings = report_config.get('processing_settings', {})
-    inverted_map = geography_df.attrs.get('inverted_map', {})
-    rename_map = proc_settings.get('rename_map', {})
+    proc_settings: Dict[str, Any] = report_config.get('processing_settings', {})
+    inverted_map: Dict[str, str] = geography_df.attrs.get('inverted_map', {})
+    rename_map: Dict[str, str] = proc_settings.get('rename_map', {})
 
-    def get_final_name(internal_name):
-        source_name = inverted_map.get(internal_name)
+    def get_final_name(internal_name: str) -> Optional[str]:
+        source_name: Optional[str] = inverted_map.get(internal_name)
         if source_name:
             return rename_map.get(source_name, source_name)
         return None
     
-    first_name_col = get_final_name('first_name')
-    last_name_col = get_final_name('last_name')
-    email_col = get_final_name('email')
+    first_name_col: Optional[str] = get_final_name('first_name')
+    last_name_col: Optional[str] = get_final_name('last_name')
+    email_col: Optional[str] = get_final_name('email')
 
-    required_cols = [c for c in [first_name_col, last_name_col, email_col] if c]
+    required_cols: List[str] = [c for c in [first_name_col, last_name_col, email_col] if c]
     
     if not attended_df.empty and all(k in attended_df.columns for k in required_cols):
-        report_df = pd.DataFrame()
+        report_df: pd.DataFrame = pd.DataFrame()
         report_df[0] = attended_df[first_name_col] + ' ' + attended_df[last_name_col]
         report_df[1] = attended_df[email_col]
         report_df.to_excel(filepath, index=False, header=False)
         logging.info(f"Файл с email адресами успешно сохранен: {filepath}")
     else:
-        missing_cols = [col for col in required_cols if col not in attended_df.columns]
+        missing_cols: List[str] = [col for col in required_cols if col not in attended_df.columns]
         logging.warning(f"Нет данных для создания файла {os.path.basename(filepath)}. "
                         f"Причина: DataFrame пуст или отсутствуют необходимые столбцы: {missing_cols}")
 
-
-def _filter_data(df, report_config):
+def _filter_data(df: pd.DataFrame, report_config: Dict[str, Any]) -> pd.DataFrame:
     """Применяет фильтры к DataFrame на основе глобального .env и конфига отчета."""
-    proc_settings = report_config['processing_settings']
+    proc_settings: Dict[str, Any] = report_config['processing_settings']
     
     # 1. Фильтрация по глобальному FILTER_LIST из .env
     if 'email' in df.columns and config.FILTER_LIST:
-        initial_rows = len(df)
+        initial_rows: int = len(df)
         # Email уже в нижнем регистре от config.py
         df = df[~df['email'].str.lower().isin(config.FILTER_LIST)]
         if (initial_rows - len(df)) > 0:
             logging.info(f"Отфильтровано {initial_rows - len(df)} строк по глобальному FILTER_LIST.")
     
     # 2. Фильтрация по ролям из конфига отчета
-    roles_to_exclude = proc_settings.get('filter', {}).get('roles_to_exclude', [])
+    roles_to_exclude: List[str] = proc_settings.get('filter', {}).get('roles_to_exclude', [])
     if 'role' in df.columns and roles_to_exclude:
-        initial_rows = len(df)
+        initial_rows: int = len(df)
         df = df[~df['role'].isin(roles_to_exclude)]
         if (initial_rows - len(df)) > 0:
             logging.info(f"Отфильтровано {initial_rows - len(df)} строк по ролям из конфига.")
@@ -139,15 +140,15 @@ def _filter_data(df, report_config):
     return df
 
 
-def _create_geography_df(df, report_config):
+def _create_geography_df(df: pd.DataFrame, report_config: Dict[str, Any]) -> pd.DataFrame:
     """Создает DataFrame для вкладки 'география участников'."""
-    proc_settings = report_config['processing_settings']
-    column_map = proc_settings['column_map']
-    inverted_map = {v: k for k, v in column_map.items()}
+    proc_settings: Dict[str, Any] = report_config['processing_settings']
+    column_map: Dict[str, str] = proc_settings['column_map']
+    inverted_map: Dict[str, str] = {v: k for k, v in column_map.items()}
 
     # Создаем DataFrame, используя только те столбцы, что есть в карте
-    internal_names_present = [name for name in inverted_map.keys() if name in df.columns]
-    report_df = df[internal_names_present].copy()
+    internal_names_present: List[str] = [name for name in inverted_map.keys() if name in df.columns]
+    report_df: pd.DataFrame = df[internal_names_present].copy()
     
     # Шаг 1: Переименовываем столбцы в их "настоящие" имена для вывода
     report_df.rename(columns=inverted_map, inplace=True)
@@ -159,17 +160,17 @@ def _create_geography_df(df, report_config):
 
     # Шаг 3: Добавляем столбец присутствия
     if 'entry_time' in df.columns:
-        not_attended_values = proc_settings.get('not_attended_values', [])
+        not_attended_values: List[str] = proc_settings.get('not_attended_values', [])
         report_df['Присутствие на вебинаре'] = df['entry_time'].apply(
             lambda x: 'нет' if pd.isna(x) or str(x).strip() in not_attended_values else 'да'
         )
 
     # Шаг 4: Применяем порядок столбцов из конфига, если он задан, и отфильтровываем лишние
-    defined_order = proc_settings.get('geography_column_order')
+    defined_order: Optional[List[str]] = proc_settings.get('geography_column_order')
     if defined_order:
         # Отфильтровываем report_df, чтобы он содержал только столбцы из defined_order,
         # которые фактически присутствуют в DataFrame, в указанном порядке.
-        final_column_order = [col for col in defined_order if col in report_df.columns]
+        final_column_order: List[str] = [col for col in defined_order if col in report_df.columns]
         report_df = report_df[final_column_order]
         logging.info("Порядок столбцов для 'географии' применен из конфигурации и нежелательные столбцы отфильтрованы.")
     else:
@@ -182,23 +183,23 @@ def _create_geography_df(df, report_config):
     return report_df
 
 
-def _create_webinar_df(df, geography_df, soup, report_config):
+def _create_webinar_df(df: pd.DataFrame, geography_df: pd.DataFrame, soup: BeautifulSoup, report_config: Dict[str, Any]) -> pd.DataFrame:
     """Создает DataFrame для сводной вкладки 'вебинар'."""
-    start_time = pd.to_datetime(df['start_time'].dropna().iloc[0]) if 'start_time' in df.columns and not df['start_time'].dropna().empty else None
-    end_time = pd.to_datetime(df['end_time'].dropna().iloc[0]) if 'end_time' in df.columns and not df['end_time'].dropna().empty else None
+    start_time: Optional[pd.Timestamp] = pd.to_datetime(df['start_time'].dropna().iloc[0]) if 'start_time' in df.columns and not df['start_time'].dropna().empty else None
+    end_time: Optional[pd.Timestamp] = pd.to_datetime(df['end_time'].dropna().iloc[0]) if 'end_time' in df.columns and not df['end_time'].dropna().empty else None
     
-    date_str = start_time.strftime('%d.%m.%y %H:%M по Мск') if start_time else "Нет данных"
-    duration_str = _calculate_duration(start_time, end_time)
-    topic = df['webinar_topic'].dropna().iloc[0] if 'webinar_topic' in df.columns and not df['webinar_topic'].dropna().empty else "Нет данных"
-    presenter = scraper.scrape_presenter(soup, report_config)
+    date_str: str = start_time.strftime('%d.%m.%y %H:%M по Мск') if start_time else "Нет данных"
+    duration_str: str = _calculate_duration(start_time, end_time)
+    topic: str = df['webinar_topic'].dropna().iloc[0] if 'webinar_topic' in df.columns and not df['webinar_topic'].dropna().empty else "Нет данных"
+    presenter: str = scraper.scrape_presenter(soup, report_config)
     
-    registered = len(geography_df)
-    attended_count = len(geography_df[geography_df['Присутствие на вебинаре'] == 'да'])
-    not_attended = registered - attended_count
-    attendance_percentage = f"{round((attended_count / registered * 100), 1)}%" if registered > 0 else "0.0%"
-    new_emails = scraper.scrape_new_emails(soup, report_config)
+    registered: int = len(geography_df)
+    attended_count: int = len(geography_df[geography_df['Присутствие на вебинаре'] == 'да'])
+    not_attended: int = registered - attended_count
+    attendance_percentage: str = f"{round((attended_count / registered * 100), 1)}%" if registered > 0 else "0.0%"
+    new_emails: int = scraper.scrape_new_emails(soup, report_config)
 
-    report_data = [
+    report_data: List[List[Any]] = [
         ["дата проведения", date_str, None, None],
         ["продолжительность", duration_str, None, None],
         ["тема", topic, None, None],
@@ -213,7 +214,7 @@ def _create_webinar_df(df, geography_df, soup, report_config):
     return pd.DataFrame(report_data, columns=["Параметр", "Значение", "Посещаемость %", "Статус"])
 
 
-def _create_chat_df(chat_file_path):
+def _create_chat_df(chat_file_path: Optional[str]) -> Optional[pd.DataFrame]:
     """Создает DataFrame для вкладки 'чат'."""
     try:
         logging.info(f"Читаю файл чата: {chat_file_path}")
@@ -223,20 +224,19 @@ def _create_chat_df(chat_file_path):
         return None
 
 
-def _get_webinar_date_str(df):
+def _get_webinar_date_str(df: pd.DataFrame) -> str:
     """Извлекает и форматирует дату вебинара."""
     if 'event_date' in df.columns and not df['event_date'].dropna().empty:
         try:
-            date_val = df['event_date'].dropna().iloc[0]
+            date_val: pd.Timestamp = df['event_date'].dropna().iloc[0]
             return pd.to_datetime(date_val).strftime('%Y-%m-%d')
         except (IndexError, TypeError): pass
     logging.warning("Дата вебинара не найдена, используется сегодняшняя дата.")
     return pd.Timestamp.now().strftime('%Y-%m-%d')
 
-
-def _calculate_duration(start, end):
+def _calculate_duration(start: Optional[pd.Timestamp], end: Optional[pd.Timestamp]) -> str:
     """Вычисляет продолжительность."""
     if pd.isna(start) or pd.isna(end): return "Нет данных"
-    total_minutes = int((end - start).total_seconds() / 60)
+    total_minutes: int = int((end - start).total_seconds() / 60)
     hours, minutes = divmod(total_minutes, 60)
     return f"{hours} час {minutes} минут"

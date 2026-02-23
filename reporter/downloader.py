@@ -1,7 +1,8 @@
 import logging
 import requests
+from typing import Optional
 
-def download_file(session, url, file_path):
+def download_file(session: requests.Session, url: str, file_path: str) -> bool:
     """
     Скачивает один файл по URL, используя аутентифицированную сессию requests.
     :param session: Объект requests.Session с cookies после авторизации.
@@ -14,7 +15,7 @@ def download_file(session, url, file_path):
         resp = session.get(url)
         resp.raise_for_status()
 
-        content_type = resp.headers.get("Content-Type", "")
+        content_type: str = resp.headers.get("Content-Type", "")
         # Проверяем, что контент похож на Excel или бинарный файл
         if "excel" in content_type or "vnd.ms-excel" in content_type or "application/octet-stream" in content_type:
             with open(file_path, "wb") as f:

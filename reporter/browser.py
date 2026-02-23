@@ -9,7 +9,10 @@ from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 from selenium.common.exceptions import TimeoutException
 from urllib.parse import urlparse
-from selenium.webdriver.chrome.service import Service # NEW IMPORT
+from selenium.webdriver.chrome.service import Service
+from selenium.webdriver.remote.webelement import WebElement
+from typing import Any, Dict, List, Optional, Tuple
+from typing_extensions import Self
 
 from . import config
 from .downloader import download_file
@@ -18,25 +21,25 @@ class BrowserManager:
     """
     Класс для управления Selenium WebDriver, включая авторизацию и скачивание файлов.
     """
-    def __init__(self, output_dir, report_config):
+    def __init__(self, output_dir: str, report_config: Dict[str, Any]) -> None:
         """
         Инициализирует BrowserManager.
         :param output_dir: Директория для сохранения скачанных файлов.
         :param report_config: Загруженный объект конфигурации отчета.
         """
-        self.output_dir = output_dir
-        self.config = report_config
-        self.selectors = self.config['source_settings']['selectors']
-        self.driver = None
-        self.session = requests.Session()
-        self.downloaded_files = []
+        self.output_dir: str = output_dir
+        self.config: Dict[str, Any] = report_config
+        self.selectors: Dict[str, Any] = self.config['source_settings']['selectors']
+        self.driver: Optional[webdriver.Chrome] = None
+        self.session: requests.Session = requests.Session()
+        self.downloaded_files: List[str] = []
 
-    def login(self):
+    def login(self) -> bool:
         """Выполняет вход на сайт, используя Selenium и селекторы из конфига."""
         logging.info("--> Entering login method.")
         try:
             logging.info("Инициализация драйвера Selenium Chrome...")
-            options = webdriver.ChromeOptions()
+            options: webdriver.ChromeOptions = webdriver.ChromeOptions()
             
             # Настройки для обхода обнаружения автоматизации
             options.add_argument('--disable-blink-features=AutomationControlled')
@@ -49,39 +52,39 @@ class BrowserManager:
             options.add_argument('--disable-extensions') # Отключает расширения браузера
             options.add_argument('--log-level=3') # Уменьшает детализацию логов Chromedriver в консоли
 
-            prefs = {"download.default_directory": os.path.abspath(self.output_dir)}
+            prefs: Dict[str, str] = {"download.default_directory": os.path.abspath(self.output_dir)}
             options.add_experimental_option("prefs", prefs)
             options.add_argument('--disable-gpu')
             options.add_argument('--window-size=1920,1080')
 
             # Указываем путь для логов Chromedriver
-            service = Service(log_path=os.path.join(os.path.abspath(self.output_dir), "chromedriver.log"))
+            service: Service = Service(log_path=os.path.join(os.path.abspath(self.output_dir), "chromedriver.log"))
             self.driver = webdriver.Chrome(service=service, options=options)
             
-            login_url = self.config['source_settings']['login_url']
+            login_url: str = self.config['source_settings']['login_url']
             logging.info(f"Перехожу на страницу входа: {login_url}")
             self.driver.get(login_url)
 
-            wait = WebDriverWait(self.driver, 40)
+            wait: WebDriverWait = WebDriverWait(self.driver, 40)
             
             # Используем селекторы из конфига
-            login_selectors = self.selectors['login']
-            email_input = wait.until(EC.presence_of_element_located((By.CSS_SELECTOR, login_selectors['email_input'])))
+            login_selectors: Dict[str, str] = self.selectors['login']
+            email_input: WebElement = wait.until(EC.presence_of_element_located((By.CSS_SELECTOR, login_selectors['email_input'])))
             email_input.send_keys(config.LOGIN)
 
-            submit_button = wait.until(EC.element_to_be_clickable((By.CSS_SELECTOR, login_selectors['submit_button'])))
+            submit_button: WebElement = wait.until(EC.element_to_be_clickable((By.CSS_SELECTOR, login_selectors['submit_button'])))
             submit_button.click()
             
-            password_input = wait.until(EC.presence_of_element_located((By.CSS_SELECTOR, login_selectors['password_input'])))
+            password_input: WebElement = wait.until(EC.presence_of_element_located((By.CSS_SELECTOR, login_selectors['password_input'])))
             password_input.send_keys(config.PASSWORD)
 
-            login_button = wait.until(EC.element_to_be_clickable((By.CSS_SELECTOR, login_selectors['login_button'])))
+            login_button: WebElement = wait.until(EC.element_to_be_clickable((By.CSS_SELECTOR, login_selectors['login_button'])))
             login_button.click()
 
             wait.until(EC.presence_of_element_located((By.XPATH, login_selectors['success_indicator'])))
             logging.info("Авторизация через Selenium прошла успешно.")
             
-            selenium_cookies = self.driver.get_cookies()
+            selenium_cookies: List[Dict[str, Any]] = self.driver.get_cookies()
             for cookie in selenium_cookies:
                 self.session.cookies.set(cookie['name'], cookie['value'], domain=cookie['domain'])
             
@@ -95,30 +98,30 @@ class BrowserManager:
             logging.error(f"Произошла ошибка при авторизации через Selenium: {e}")
             return False
 
-    def download_source_files(self, page_url):
+    def download_source_files(self, page_url: str) -> Optional[Tuple[str, Optional[str], BeautifulSoup]]:
         """Кликает на кнопки скачивания и скачивает файлы."""
         logging.info("--> Entering download_source_files method.")
         if not self.driver: return None
 
         logging.info(f"Перехожу на страницу мероприятия: {page_url}")
         
-        final_stats_file_path = None
-        final_chat_file_path = None
-        dl_selectors = self.selectors['download']
+        final_stats_file_path: Optional[str] = None
+        final_chat_file_path: Optional[str] = None
+        dl_selectors: Dict[str, str] = self.selectors['download']
 
         try:
             self.driver.get(page_url)
-            wait = WebDriverWait(self.driver, 20)
+            wait: WebDriverWait = WebDriverWait(self.driver, 20)
             
             # Скачиваем СТАТИСТИКУ
             try:
                 logging.info("Ищу кнопку для скачивания статистики...")
-                stats_button = wait.until(EC.presence_of_element_located((By.XPATH, dl_selectors['stats_button'])))
+                stats_button: WebElement = wait.until(EC.presence_of_element_located((By.XPATH, dl_selectors['stats_button'])))
                 self.driver.execute_script("arguments[0].click();", stats_button)
-                stats_url = self._handle_download_notification(wait)
+                stats_url: Optional[str] = self._handle_download_notification(wait)
 
                 if stats_url:
-                    stats_filename = "statistic_" + os.path.basename(urlparse(stats_url).path)
+                    stats_filename: str = "statistic_" + os.path.basename(urlparse(stats_url).path)
                     final_stats_file_path = os.path.join(self.output_dir, stats_filename)
                     if download_file(self.session, stats_url, final_stats_file_path):
                         self.downloaded_files.append(final_stats_file_path)
@@ -131,12 +134,12 @@ class BrowserManager:
             # Скачиваем ЧАТ
             try:
                 logging.info("Ищу кнопку для скачивания чата...")
-                chat_button = wait.until(EC.presence_of_element_located((By.XPATH, dl_selectors['chat_button'])))
+                chat_button: WebElement = wait.until(EC.presence_of_element_located((By.XPATH, dl_selectors['chat_button'])))
                 self.driver.execute_script("arguments[0].click();", chat_button)
-                chat_url = self._handle_download_notification(wait)
+                chat_url: Optional[str] = self._handle_download_notification(wait)
 
                 if chat_url:
-                    chat_filename = "chat_" + os.path.basename(urlparse(chat_url).path)
+                    chat_filename: str = "chat_" + os.path.basename(urlparse(chat_url).path)
                     final_chat_file_path = os.path.join(self.output_dir, chat_filename)
                     if download_file(self.session, chat_url, final_chat_file_path):
                         self.downloaded_files.append(final_chat_file_path)
@@ -150,15 +153,15 @@ class BrowserManager:
             logging.error(f"Ошибка при скачивании файлов: {e}")
             return None
 
-    def _handle_download_notification(self, wait):
+    def _handle_download_notification(self, wait: WebDriverWait) -> Optional[str]:
         """Обрабатывает уведомление (Snackbar) и извлекает ссылку."""
-        dl_selectors = self.selectors['download']
+        dl_selectors: Dict[str, str] = self.selectors['download']
         try:
-            snackbar = wait.until(EC.presence_of_element_located((By.XPATH, dl_selectors['snackbar_notification'])))
-            download_url = snackbar.find_element(By.XPATH, dl_selectors['snackbar_link']).get_attribute("href")
+            snackbar: WebElement = wait.until(EC.presence_of_element_located((By.XPATH, dl_selectors['snackbar_notification'])))
+            download_url: str = snackbar.find_element(By.XPATH, dl_selectors['snackbar_link']).get_attribute("href")
             logging.info(f"Извлечена ссылка для скачивания: {download_url}")
             
-            close_button = snackbar.find_element(By.XPATH, dl_selectors['snackbar_close_button'])
+            close_button: WebElement = snackbar.find_element(By.XPATH, dl_selectors['snackbar_close_button'])
             self.driver.execute_script("arguments[0].click();", close_button)
             wait.until(EC.invisibility_of_element(snackbar))
             logging.info("Уведомление успешно закрыто.")
@@ -171,7 +174,7 @@ class BrowserManager:
             logging.error(f"Ошибка при обработке уведомления: {e}")
             return None
 
-    def quit_driver(self):
+    def quit_driver(self) -> None:
         """Корректно закрывает драйвер Selenium."""
         if self.driver:
             logging.info("Закрываю драйвер Selenium.")
