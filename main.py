@@ -16,7 +16,7 @@ def main() -> None:
     """
     Основная функция для запуска процесса генерации отчетов.
     """
-    print("Main function started execution.")
+    logging.info("Main function started execution.")
     try:
         # 1. Настройка и парсинг аргументов
         logging.info("--> main: Script started.")
