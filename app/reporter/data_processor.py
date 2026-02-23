@@ -8,7 +8,13 @@ from . import config, scraper, config_loader
 
 def process_and_generate_reports(statistic_file_path: str, chat_file_path: Optional[str], soup: BeautifulSoup, report_config: Dict[str, Any]) -> None:
     """
-    Главная функция обработки данных, управляемая конфигурационным файлом.
+    Главная функция обработки данных и генерации отчетов, управляемая конфигурационным файлом.
+    Осуществляет чтение исходных файлов, базовую очистку, фильтрацию и создание различных отчетов.
+
+    :param statistic_file_path: Путь к файлу Excel со статистикой вебинара.
+    :param chat_file_path: Опциональный путь к файлу Excel с данными чата.
+    :param soup: Объект BeautifulSoup, содержащий HTML страницы для скрапинга дополнительных данных.
+    :param report_config: Загруженный объект конфигурации отчета.
     """
     proc_settings: Dict[str, Any] = report_config['processing_settings']
     
@@ -60,7 +66,16 @@ def process_and_generate_reports(statistic_file_path: str, chat_file_path: Optio
 
 
 def _save_standard_report(filepath: str, report_details: Dict[str, Any], base_geography_df: pd.DataFrame, webinar_df: pd.DataFrame, chat_df: Optional[pd.DataFrame]) -> None:
-    """Сохраняет стандартный отчет с несколькими листами, как описано в конфиге."""
+    """
+    Сохраняет стандартный отчет в формате Excel с несколькими листами,
+    структура которых описывается в конфигурационном файле.
+
+    :param filepath: Полный путь, по которому будет сохранен файл отчета.
+    :param report_details: Детали отчета из конфигурации, включающие информацию о листах.
+    :param base_geography_df: DataFrame с географическими данными участников.
+    :param webinar_df: DataFrame со сводной информацией о вебинаре.
+    :param chat_df: Опциональный DataFrame с данными чата.
+    """
     with pd.ExcelWriter(filepath, engine='openpyxl') as writer:
         for sheet_info in report_details.get('sheets', []):
             sheet_type: str = sheet_info['type']
@@ -86,7 +101,14 @@ def _save_standard_report(filepath: str, report_details: Dict[str, Any], base_ge
 
 
 def _create_attended_emails_file(geography_df: pd.DataFrame, filepath: str, report_config: Dict[str, Any]) -> None:
-    """Создает и сохраняет файл только с email-адресами присутствовавших."""
+    """
+    Создает и сохраняет отдельный файл Excel, содержащий только имена и email-адреса
+    участников, которые присутствовали на вебинаре.
+
+    :param geography_df: DataFrame с географическими данными участников, включая статус присутствия.
+    :param filepath: Полный путь, по которому будет сохранен файл.
+    :param report_config: Загруженный объект конфигурации отчета.
+    """
     attended_df: pd.DataFrame = geography_df[geography_df['Присутствие на вебинаре'] == 'да'].copy()
 
     # Динамически находим финальные имена нужных столбцов
@@ -118,7 +140,14 @@ def _create_attended_emails_file(geography_df: pd.DataFrame, filepath: str, repo
                         f"Причина: DataFrame пуст или отсутствуют необходимые столбцы: {missing_cols}")
 
 def _filter_data(df: pd.DataFrame, report_config: Dict[str, Any]) -> pd.DataFrame:
-    """Применяет фильтры к DataFrame на основе глобального .env и конфига отчета."""
+    """
+    Применяет различные фильтры к DataFrame с исходными данными на основе
+    глобального списка исключений из .env и ролей для исключения из конфига отчета.
+
+    :param df: Исходный DataFrame для фильтрации.
+    :param report_config: Загруженный объект конфигурации отчета.
+    :return: Отфильтрованный DataFrame.
+    """
     proc_settings: Dict[str, Any] = report_config['processing_settings']
     
     # 1. Фильтрация по глобальному FILTER_LIST из .env
@@ -141,7 +170,14 @@ def _filter_data(df: pd.DataFrame, report_config: Dict[str, Any]) -> pd.DataFram
 
 
 def _create_geography_df(df: pd.DataFrame, report_config: Dict[str, Any]) -> pd.DataFrame:
-    """Создает DataFrame для вкладки 'география участников'."""
+    """
+    Создает DataFrame для вкладки 'география участников' в выходном отчете.
+    Выполняет переименование столбцов, добавление статуса присутствия и применение порядка столбцов.
+
+    :param df: DataFrame с исходными данными участников.
+    :param report_config: Загруженный объект конфигурации отчета.
+    :return: DataFrame, подготовленный для вкладки 'география'.
+    """
     proc_settings: Dict[str, Any] = report_config['processing_settings']
     column_map: Dict[str, str] = proc_settings['column_map']
     inverted_map: Dict[str, str] = {v: k for k, v in column_map.items()}
@@ -184,7 +220,16 @@ def _create_geography_df(df: pd.DataFrame, report_config: Dict[str, Any]) -> pd.
 
 
 def _create_webinar_df(df: pd.DataFrame, geography_df: pd.DataFrame, soup: BeautifulSoup, report_config: Dict[str, Any]) -> pd.DataFrame:
-    """Создает DataFrame для сводной вкладки 'вебинар'."""
+    """
+    Создает DataFrame для сводной вкладки 'вебинар' в выходном отчете.
+    Извлекает данные о дате, продолжительности, теме, ведущем, количестве зарегистрированных и присутствовавших.
+
+    :param df: DataFrame с исходными данными, содержащий временные метки и тему вебинара.
+    :param geography_df: DataFrame с данными географии участников, используется для подсчета присутствовавших.
+    :param soup: Объект BeautifulSoup для скрапинга дополнительных данных (например, новых email).
+    :param report_config: Загруженный объект конфигурации отчета.
+    :return: DataFrame, подготовленный для сводной вкладки вебинара.
+    """
     start_time: Optional[pd.Timestamp] = pd.to_datetime(df['start_time'].dropna().iloc[0]) if 'start_time' in df.columns and not df['start_time'].dropna().empty else None
     end_time: Optional[pd.Timestamp] = pd.to_datetime(df['end_time'].dropna().iloc[0]) if 'end_time' in df.columns and not df['end_time'].dropna().empty else None
     
@@ -215,7 +260,12 @@ def _create_webinar_df(df: pd.DataFrame, geography_df: pd.DataFrame, soup: Beaut
 
 
 def _create_chat_df(chat_file_path: Optional[str]) -> Optional[pd.DataFrame]:
-    """Создает DataFrame для вкладки 'чат'."""
+    """
+    Создает DataFrame из файла Excel, содержащего сообщения чата вебинара.
+
+    :param chat_file_path: Путь к файлу Excel с данными чата.
+    :return: DataFrame с сообщениями чата или None, если файл не найден или произошла ошибка чтения.
+    """
     try:
         logging.info(f"Читаю файл чата: {chat_file_path}")
         return pd.read_excel(chat_file_path, sheet_name='Сообщения чата')
@@ -225,7 +275,13 @@ def _create_chat_df(chat_file_path: Optional[str]) -> Optional[pd.DataFrame]:
 
 
 def _get_webinar_date_str(df: pd.DataFrame) -> str:
-    """Извлекает и форматирует дату вебинара."""
+    """
+    Извлекает и форматирует дату вебинара из DataFrame.
+    Если дата не найдена, используется текущая дата.
+
+    :param df: DataFrame с данными вебинара, ожидается столбец 'event_date'.
+    :return: Строка с датой вебинара в формате 'YYYY-MM-DD'.
+    """
     if 'event_date' in df.columns and not df['event_date'].dropna().empty:
         try:
             date_val: pd.Timestamp = df['event_date'].dropna().iloc[0]
@@ -235,7 +291,13 @@ def _get_webinar_date_str(df: pd.DataFrame) -> str:
     return pd.Timestamp.now().strftime('%Y-%m-%d')
 
 def _calculate_duration(start: Optional[pd.Timestamp], end: Optional[pd.Timestamp]) -> str:
-    """Вычисляет продолжительность."""
+    """
+    Вычисляет и форматирует продолжительность вебинара в виде строки "X час Y минут".
+
+    :param start: Начальное время вебинара (объект pd.Timestamp).
+    :param end: Конечное время вебинара (объект pd.Timestamp).
+    :return: Строка с продолжительностью или "Нет данных", если время не указано.
+    """
     if pd.isna(start) or pd.isna(end): return "Нет данных"
     total_minutes: int = int((end - start).total_seconds() / 60)
     hours, minutes = divmod(total_minutes, 60)

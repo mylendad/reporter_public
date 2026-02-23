@@ -1,8 +1,7 @@
 import argparse
 import logging
-from typing import Any, Dict, Optional
 
-from app import (
+from app.reporter import (
     OUTPUT_DIR,
     BrowserManager,
     cleanup_files,
@@ -33,7 +32,7 @@ def main() -> None:
         logging.info("--> main: Parsed arguments.")
 
         # 2. Загрузка конфигурации
-        report_config: Optional[Dict[str, Any]] = load_config(args.config)
+        report_config = load_config(args.config)
         if not report_config:
             return
         logging.info("--> main: Loaded report config.")

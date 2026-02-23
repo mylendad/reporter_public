@@ -1,19 +1,33 @@
 import logging
 import re
-from typing import Any, Dict
+from typing import Any, Dict, Optional
+
 from bs4 import BeautifulSoup
 
-def scrape_presenter(soup: Optional[BeautifulSoup], report_config: Dict[str, Any]) -> str:
-    """Парсит имя ведущего со страницы, используя селекторы из конфига."""
-    if not soup: return "Не удалось получить"
-    
-    scraper_selectors: Dict[str, str] = report_config['source_settings']['selectors']['scraper']
-    presenter_text: Optional[str] = scraper_selectors.get('presenter')
-    
+
+def scrape_presenter(
+    soup: Optional[BeautifulSoup], report_config: Dict[str, Any]
+) -> str:
+    """
+    Парсит имя ведущего со страницы HTML, используя селекторы, указанные в конфигурационном файле.
+    Пытается найти текст, соответствующий шаблону ведущего, и извлекает следующее текстовое содержимое.
+
+    :param soup: Объект BeautifulSoup, представляющий разобранный HTML страницы.
+    :param report_config: Загруженный объект конфигурации отчета.
+    :return: Имя ведущего в виде строки, или сообщение об ошибке/недоступности, если парсинг не удался.
+    """
+    if not soup:
+        return "Не удалось получить"
+
+    scraper_selectors: Dict[str, str] = report_config["source_settings"]["selectors"][
+        "scraper"
+    ]
+    presenter_text: Optional[str] = scraper_selectors.get("presenter")
+
     if not presenter_text:
         logging.warning("Селектор для имени ведущего не найден в конфиге.")
         return "Не настроено"
-        
+
     try:
         presenter_tag = soup.find(string=re.compile(presenter_text))
         if presenter_tag:
@@ -26,17 +40,29 @@ def scrape_presenter(soup: Optional[BeautifulSoup], report_config: Dict[str, Any
         logging.warning(f"Не удалось извлечь имя ведущего: {e}")
     return "Не найдено"
 
-def scrape_new_emails(soup: Optional[BeautifulSoup], report_config: Dict[str, Any]) -> str:
-    """Парсит количество новых email'ов, используя селекторы из конфига."""
-    if not soup: return "Не удалось получить"
-    
-    scraper_selectors: Dict[str, str] = report_config['source_settings']['selectors']['scraper']
-    email_selector: Optional[str] = scraper_selectors.get('new_emails')
+
+def scrape_new_emails(
+    soup: Optional[BeautifulSoup], report_config: Dict[str, Any]
+) -> str:
+    """
+    Парсит количество новых email-адресов из HTML страницы, используя CSS-селектор из конфигурационного файла.
+
+    :param soup: Объект BeautifulSoup, представляющий разобранный HTML страницы.
+    :param report_config: Загруженный объект конфигурации отчета.
+    :return: Количество новых email'ов в виде строки, или сообщение об ошибке/недоступности, если парсинг не удался.
+    """
+    if not soup:
+        return "Не удалось получить"
+
+    scraper_selectors: Dict[str, str] = report_config["source_settings"]["selectors"][
+        "scraper"
+    ]
+    email_selector: Optional[str] = scraper_selectors.get("new_emails")
 
     if not email_selector:
         logging.warning("Селектор для новых email не найден в конфиге.")
         return "Не настроено"
-        
+
     try:
         email_tag = soup.select_one(email_selector)
         if email_tag:

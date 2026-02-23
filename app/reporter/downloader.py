@@ -1,6 +1,7 @@
 import logging
+
 import requests
-from typing import Optional
+
 
 def download_file(session: requests.Session, url: str, file_path: str) -> bool:
     """
@@ -13,17 +14,23 @@ def download_file(session: requests.Session, url: str, file_path: str) -> bool:
     logging.info(f"Скачиваю {url} -> {file_path}")
     try:
         resp = session.get(url)
-        resp.raise_for_status()
+        resp.raise_for_status()  # вызывает исключение HTTPError при коде 400-599
 
         content_type: str = resp.headers.get("Content-Type", "")
         # Проверяем, что контент похож на Excel или бинарный файл
-        if "excel" in content_type or "vnd.ms-excel" in content_type or "application/octet-stream" in content_type:
+        if (
+            "excel" in content_type
+            or "vnd.ms-excel" in content_type
+            or "application/octet-stream" in content_type
+        ):
             with open(file_path, "wb") as f:
                 f.write(resp.content)
             logging.info(f"Файл успешно сохранен: {file_path}")
             return True
         else:
-            logging.warning(f"Пропущено скачивание (неверный Content-Type): {url}. Content-Type: {content_type}")
+            logging.warning(
+                f"Пропущено скачивание (неверный Content-Type): {url}. Content-Type: {content_type}"
+            )
             return False
     except requests.RequestException as e:
         logging.error(f"Ошибка при скачивании {url}: {e}")

@@ -53,7 +53,11 @@ def get_internal_column_names(
     config: Dict[str, Any], real_names: List[str]
 ) -> List[str]:
     """
-    Преобразует список реальных имен столбцов в список внутренних имен.
+    Преобразует список реальных имен столбцов в список внутренних имен на основе карты столбцов из конфигурации.
+
+    :param config: Загруженный объект конфигурации.
+    :param real_names: Список реальных (видимых пользователю) имен столбцов.
+    :return: Список соответствующих внутренних имен столбцов.
     """
     column_map = config["processing_settings"]["column_map"]
     internal_names = [
@@ -63,5 +67,10 @@ def get_internal_column_names(
 
 
 def get_all_real_column_names(config: Dict[str, Any]) -> List[str]:
-    """Возвращает список всех реальных имен столбцов из конфига."""
+    """
+    Возвращает список всех реальных (видимых пользователю) имен столбцов, определенных в карте столбцов конфигурации.
+
+    :param config: Загруженный объект конфигурации.
+    :return: Список всех реальных имен столбцов.
+    """
     return list(config["processing_settings"]["column_map"].keys())
